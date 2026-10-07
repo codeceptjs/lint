@@ -1,0 +1,43 @@
+{
+  "name": "@codeceptjs/lint",
+  "version": "0.1.0",
+  "description": "Linter for CodeceptJS tests, page objects and helpers",
+  "type": "module",
+  "main": "lib/Linter.js",
+  "exports": {
+    ".": "./lib/Linter.js"
+  },
+  "bin": {
+    "codeceptjs-lint": "bin/lint.js"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "test": "mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codeceptjs/lint.git"
+  },
+  "keywords": [
+    "codeceptjs",
+    "lint",
+    "testing"
+  ],
+  "author": "DavertMik",
+  "license": "MIT",
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "glob": "^13.0.6"
+  },
+  "devDependencies": {
+    "chai": "^6.3.0",
+    "mocha": "^12.0.3"
+  }
+}
