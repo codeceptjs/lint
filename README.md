@@ -24,20 +24,24 @@ Exit codes: `0` no errors (warnings allowed), `1` errors found, `2` bad input or
 
 ## Rules
 
+<!-- rules:start -->
 | Rule | Default | Detects |
 | --- | --- | --- |
-| `no-fixed-wait` | error | `I.wait(5)` with a number. Use `I.waitForElement`, `I.waitForText`, `I.see` |
-| `no-sleep` | error | `setTimeout`, including `await new Promise(r => setTimeout(r, ms))` and `timers/promises`, outside helpers |
-| `no-if-in-test` | error | `if` inside a Scenario or hook. Use `tryTo()` from `codeceptjs/effects` |
-| `no-fetch` | error | `fetch()` outside helpers. Use the REST helper: `I.sendGetRequest`, `I.sendPostRequest` |
-| `no-console` | warn | `console.*` outside helpers. Use `I.say()` |
-| `no-only` | error on CI, warn locally | `Scenario.only`, `Feature.only`, `Data(...).only` |
-| `no-pause` | error on CI, warn locally | `pause()` |
-| `no-skip` | warn | `Scenario.skip`, `Feature.skip`, `xScenario`, `xFeature` |
-| `secret-credentials` | error | `I.fillField` on a password, token, secret or API key field, or such a `process.env.*` passed to `I.*`, without `secret()` |
-| `await-grab` | error | `I.grab*()` assigned or used without `await` |
-| `no-actor-in-helper` | error | `I` inside a class extending `Helper`. Use `this.helpers[...]` |
-| `raw-browser-in-test` | warn | `I.use*To`, `I.executeScript` in a Scenario. Move it into a helper or page object |
+| `no-fixed-wait` | error | I.wait(5) sleeps for a fixed time. Wait for a condition with I.waitForElement, I.waitForText or I.see |
+| `no-sleep` | error | setTimeout, including window.setTimeout, await new Promise(r => setTimeout(r, ms)) and timers/promises, sleeps for a fixed time. Wait for a condition instead |
+| `no-if-in-test` | error | if inside a Scenario or hook makes the test non-deterministic. Use tryTo() from codeceptjs/effects for optional steps |
+| `no-fetch` | error | fetch() in tests or page objects, including window.fetch and globalThis.fetch, bypasses CodeceptJS steps and logs. Use the REST helper: I.sendGetRequest, I.sendPostRequest |
+| `no-console` | warn | console.log in tests or page objects is not part of the test report. Use I.say() |
+| `no-only` | error on CI, warn locally | Scenario.only, Feature.only and Data().only run only focused tests. Error on CI, warning locally |
+| `no-pause` | error on CI, warn locally | pause() and this.pause() stop the test for interactive debugging. Error on CI, warning locally |
+| `no-skip` | warn | Scenario.skip, Feature.skip, xScenario and xFeature leave tests out of the run |
+| `secret-credentials` | error | Passwords, tokens and API keys passed to I.* in plain text are printed in logs. Wrap them with secret() |
+| `await-grab` | error | I.grab*() returns a promise. Assigned, destructured or passed anywhere without await — including as an argument or object property, but not in Promise.all or .then() chains — it is a bug |
+| `no-actor-in-helper` | error | I is not available inside a helper. Call other helpers via this.helpers[...] |
+| `raw-browser-in-test` | warn | I.usePlaywrightTo, I.useWebDriverTo and I.executeScript in a Scenario. Move raw browser code into a helper or page object |
+<!-- rules:end -->
+
+Rules live as one file per rule in [`lib/rules/`](lib/rules); run `npm run docs` to regenerate this table after changing a rule.
 
 "On CI" means the `CI` environment variable is set, which every CI provider does. Locally `pause()` and `.only` stay warnings, so a debugging stub doesn't fail the lint.
 
@@ -66,6 +70,8 @@ I.wait(1)
 ```
 
 TypeScript is read with Node's type stripping (Node 22.13+). Files that use `enum` or `namespace` are reported as parse errors.
+
+A TypeScript config that imports `.js` paths of `.ts` files (the tsx/esbuild convention) can't be loaded by plain Node. If the linted project has `tsx` installed, the linter registers its loader automatically; otherwise loading such a config falls back to linting without it — pass paths explicitly in that case.
 
 ## CI
 

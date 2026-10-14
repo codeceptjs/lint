@@ -45,6 +45,11 @@ describe('@codeceptjs/lint', () => {
       expect(rules('class X extends Helper {\n  m() { setTimeout(() => {}, 1) }\n}')).to.deep.equal([])
     })
 
+    it('no-sleep catches window.setTimeout and globalThis.setTimeout', () => {
+      const code = 'window.setTimeout(() => {}, 1)\nglobalThis.setTimeout(() => {}, 1)\nself.setTimeout(() => {}, 1)\nfoo.setTimeout(() => {}, 1)\nclass X extends Helper {\n  m() { window.setTimeout(() => {}, 1) }\n}'
+      expect(rules(code)).to.deep.equal(['1:no-sleep', '2:no-sleep', '3:no-sleep'])
+    })
+
     it('no-if-in-test', () => {
       const code = "Scenario('a', ({ I }) => {\n  if (x) I.click('a')\n})\nBefore(({ I }) => {\n  if (y) I.click('b')\n})\nfunction f() {\n  if (z) return\n}"
       expect(rules(code)).to.deep.equal(['2:no-if-in-test', '5:no-if-in-test'])
@@ -53,6 +58,11 @@ describe('@codeceptjs/lint', () => {
 
     it('no-fetch', () => {
       expect(rules("await fetch('/api')\nclass X extends Helper {\n  m() { fetch('/api') }\n}")).to.deep.equal(['1:no-fetch'])
+    })
+
+    it('no-fetch catches window.fetch and globalThis.fetch', () => {
+      const code = "window.fetch('/api')\nglobalThis.fetch('/api')\nfoo.fetch('/api')\nclass X extends Helper {\n  m() { globalThis.fetch('/api') }\n}"
+      expect(rules(code)).to.deep.equal(['1:no-fetch', '2:no-fetch'])
     })
 
     it('no-console', () => {
@@ -65,6 +75,10 @@ describe('@codeceptjs/lint', () => {
       expect(lint(code).map(f => `${f.rule}:${f.level}`)).to.deep.equal(['no-only:warn', 'no-only:warn', 'no-only:warn', 'no-pause:warn'])
       process.env.CI = 'true'
       expect(lint(code).map(f => f.level)).to.deep.equal(['error', 'error', 'error', 'error'])
+    })
+
+    it('no-pause catches this.pause()', () => {
+      expect(rules('this.pause()\nobj.pause()')).to.deep.equal(['1:no-pause'])
     })
 
     it('no-skip', () => {
@@ -82,9 +96,25 @@ describe('@codeceptjs/lint', () => {
       expect(rules(code)).to.deep.equal(['1:secret-credentials', '4:secret-credentials'])
     })
 
+    it('secret-credentials catches computed env access and only process.env', () => {
+      const code = [
+        "I.fillField(loc, process.env['PASSWORD'])",
+        "I.fillField(loc, secret(process.env['PASSWORD']))",
+        "I.fillField(loc, process.env['api-key'])",
+        "I.fillField(loc, process.env['USERNAME'])",
+        'I.fillField(loc, foo.env.TOKEN)',
+      ].join('\n')
+      expect(rules(code)).to.deep.equal(['1:secret-credentials', '3:secret-credentials'])
+    })
+
     it('await-grab', () => {
       const code = ['const a = I.grabTextFrom("h1")', 'const b = await I.grabTextFrom("h1")', 'return I.grabTextFrom("h1")', 'I.grabTextFrom("h1").length', 'await Promise.all([I.grabTitle()])'].join('\n')
       expect(lint(`async function f() {\n${code}\n}`).map(f => `${f.line}:${f.rule}`)).to.deep.equal(['2:await-grab', '5:await-grab'])
+    })
+
+    it('await-grab allows promise chains, flags destructuring, arguments and properties', () => {
+      const code = ['const { text } = I.grabTextFrom("h1")', 'I.grabTextFrom("h1").then(t => t)', 'I.grabTextFrom("h1").catch(e => e)', 'I.see(I.grabTextFrom("h1"))', 'const o = { title: I.grabTitle() }'].join('\n')
+      expect(lint(`async function f() {\n${code}\n}`).map(f => `${f.line}:${f.rule}`)).to.deep.equal(['2:await-grab', '5:await-grab', '6:await-grab'])
     })
 
     it('no-actor-in-helper', () => {
@@ -122,11 +152,41 @@ describe('@codeceptjs/lint', () => {
     expect(rules("const x = require('x')\nreturn I.wait(1)")).to.deep.equal(['2:no-fixed-wait'])
   })
 
+  it('truncates finding source to a single line', () => {
+    const code = "Scenario('a', ({ I }) => {\n  if (x) {\n    I.click('a')\n    I.click('b')\n  }\n})"
+    const [finding] = lint(code)
+    expect(finding.source).to.equal('if (x) {')
+    expect(lint('I.wait(5)')[0].source).to.equal('I.wait(5)')
+    const long = `I.fillField('${'password'.repeat(50)}', 'v')`
+    expect(lint(long)[0].source.length).to.be.at.most(120)
+    expect(lint(long)[0].source.endsWith('...')).to.be.true
+  })
+
+  it('includes the file in parse errors', () => {
+    try {
+      lint('const =', 'bad.js')
+      throw new Error('should have thrown')
+    } catch (err) {
+      expect(err.message).to.match(/^bad\.js: /)
+      expect(err.file).to.equal('bad.js')
+    }
+  })
+
+  it('keeps one rule per file in lib/rules', async () => {
+    const rules = (await import('../lib/rules/index.js')).default
+    const files = fs.readdirSync(path.join(__dirname, '../lib/rules')).filter(f => f.endsWith('.js') && !['base.js', 'utils.js', 'index.js'].includes(f))
+    expect(rules.map(rule => rule.id)).to.have.lengthOf(files.length)
+    for (const rule of rules) {
+      expect(files).to.include(`${rule.id}.js`)
+    }
+    expect(new Set(rules.map(rule => rule.id)).size).to.equal(rules.length)
+  })
+
   it('collects tests, include and helper files from config', async () => {
     const linter = await Linter.load(path.join(project, 'codecept.conf.js'))
     const files = linter
       .files()
-      .map(f => path.relative(project, f))
+      .map(f => path.relative(project, f).replaceAll('\\', '/'))
       .sort()
     expect(files).to.deep.equal(['checkout_test.js', 'custom_helper.js', 'existing_test.js', 'pages/login.js', 'steps_file.js'])
     expect(linter.includes(path.join(project, 'new_test.js'))).to.be.true
@@ -148,6 +208,26 @@ describe('@codeceptjs/lint', () => {
       expect(run(['-r', 'no-fetch']).stdout).not.to.include('no-fixed-wait')
       expect(run(['--rules', 'no-fetch,no-actor-in-helper']).stdout).to.include('no-actor-in-helper')
       expect(run(['-r', 'nope']).status).to.equal(2)
+    })
+
+    it('reports parse errors with exit code 2', () => {
+      const result = run(['bad_syntax.js'])
+      expect(result.status).to.equal(2)
+      expect(result.stderr).to.include('bad_syntax.js')
+      expect(result.stderr).to.include('parse error')
+    })
+
+    it('prints findings as JSON with --json', () => {
+      const result = run(['--json'])
+      const findings = JSON.parse(result.stdout)
+      expect(findings).to.be.an('array').with.length.greaterThan(0)
+      for (const key of ['file', 'line', 'column', 'rule', 'level', 'message', 'source']) {
+        expect(findings[0]).to.have.property(key)
+      }
+      for (const finding of findings) {
+        expect(finding.level).to.be.oneOf(['error', 'warn'])
+      }
+      expect(result.status).to.equal(1)
     })
 
     it('lists rules', () => {

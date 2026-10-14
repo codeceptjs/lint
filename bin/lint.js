@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { parseArgs } from 'util'
 import Linter from '../lib/Linter.js'
-import rules from '../lib/rules.js'
+import rules from '../lib/rules/index.js'
 
 const { values: options, positionals: paths } = parseArgs({
   allowPositionals: true,
@@ -69,7 +69,7 @@ for (const file of files) {
     findings.push(...linter.lintFile(file))
   } catch (err) {
     process.exitCode = 2
-    console.error(`${path.relative(process.cwd(), file)}  parse error  ${err.message}`)
+    console.error(err.file ? `parse error  ${err.message}` : `${path.relative(process.cwd(), file).replaceAll('\\', '/')}  parse error  ${err.message}`)
   }
 }
 
@@ -124,5 +124,5 @@ async function hook(linter) {
 }
 
 function format(finding) {
-  return `${path.relative(process.cwd(), finding.file)}:${finding.line}:${finding.column}  ${finding.level}  ${finding.rule}  ${finding.message}`
+  return `${path.relative(process.cwd(), finding.file).replaceAll('\\', '/')}:${finding.line}:${finding.column}  ${finding.level}  ${finding.rule}  ${finding.message}`
 }
