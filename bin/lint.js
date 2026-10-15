@@ -5,6 +5,16 @@ import { parseArgs } from 'util'
 import Linter from '../lib/Linter.js'
 import rules from '../lib/rules/index.js'
 
+const paint = (process.stdout.isTTY || process.env.FORCE_COLOR) && !process.env.NO_COLOR
+const style = {
+  error: text => (paint ? `\x1b[1;31m${text}\x1b[0m` : text),
+  warn: text => (paint ? `\x1b[33m${text}\x1b[0m` : text),
+  file: text => (paint ? `\x1b[36m${text}\x1b[0m` : text),
+  suggestion: text => (paint ? `\x1b[32m${text}\x1b[0m` : text),
+  dim: text => (paint ? `\x1b[2m${text}\x1b[0m` : text),
+  ok: text => (paint ? `\x1b[32m${text}\x1b[0m` : text),
+}
+
 const { values: options, positionals: paths } = parseArgs({
   allowPositionals: true,
   options: {
@@ -78,7 +88,12 @@ if (options.json) {
   console.log(JSON.stringify(findings, null, 2))
 } else {
   for (const finding of findings) console.log(format(finding))
-  console.log(`${files.length} file(s) checked, ${errors} error(s), ${findings.length - errors} warning(s)`)
+  const warnings = findings.length - errors
+  if (!findings.length) {
+    console.log(style.ok(`✔ ${files.length} file(s) checked, no problems found`))
+  } else {
+    console.log(`${files.length} file(s) checked, ${style.error(`${errors} error(s)`)}, ${style.warn(`${warnings} warning(s)`)}`)
+  }
 }
 if (errors && !process.exitCode) process.exitCode = 1
 
@@ -124,5 +139,8 @@ async function hook(linter) {
 }
 
 function format(finding) {
-  return `${path.relative(process.cwd(), finding.file).replaceAll('\\', '/')}:${finding.line}:${finding.column}  ${finding.level}  ${finding.rule}  ${finding.message}`
+  const type = style[finding.level](finding.level.padEnd(5))
+  const location = style.file(`${path.relative(process.cwd(), finding.file).replaceAll('\\', '/')}:${finding.line}`)
+  const rule = style.dim(finding.rule)
+  return [`${type} ${location}  ${rule}`, `   ${finding.explanation}`, `   ${style.suggestion(finding.suggestion)}`].join('\n')
 }

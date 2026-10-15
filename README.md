@@ -14,10 +14,12 @@ npx @codeceptjs/lint -c e2e/codecept.conf.js
 
 Without paths, the linter reads `codecept.conf.js` (or `.ts`, `.cjs`, `.mjs`) from the current directory. It lints files matched by `tests`, local files from `include` (page objects, steps file) and helpers loaded with `require`.
 
-Each finding is printed on one line:
+Each finding is printed with the type, location and rule on one line, then the explanation and the suggestion indented below (colored when stdout is a TTY; set `NO_COLOR` to disable):
 
 ```
-checkout_test.js:4:3  error  no-fixed-wait  I.wait() sleeps unconditionally. Wait for a condition: I.waitForElement / I.waitForText / I.see
+error checkout_test.js:4  no-fixed-wait
+   I.wait() sleeps unconditionally
+   wait for a condition: I.waitForElement / I.waitForText / I.see
 ```
 
 Exit codes: `0` no errors (warnings allowed), `1` errors found, `2` bad input or a file that can't be parsed.
