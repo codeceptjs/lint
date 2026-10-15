@@ -196,9 +196,9 @@ describe('@codeceptjs/lint', () => {
   describe('CLI', () => {
     it('lints files from codecept config', () => {
       const result = run([])
-      expect(result.stdout).to.include('checkout_test.js:4:3  error  no-fixed-wait')
-      expect(result.stdout).to.include('custom_helper.js:5:13  error  no-actor-in-helper')
-      expect(result.stdout).to.include('pages/login.js:5:11  error  no-fetch')
+      expect(result.stdout).to.include('error checkout_test.js:4  no-fixed-wait')
+      expect(result.stdout).to.include('custom_helper.js:5  no-actor-in-helper')
+      expect(result.stdout).to.include('pages/login.js:5  no-fetch')
       expect(result.stdout).not.to.include('raw-browser-in-test')
       expect(result.stdout).not.to.include('no-sleep')
       expect(result.status).to.equal(1)
@@ -221,13 +221,20 @@ describe('@codeceptjs/lint', () => {
       const result = run(['--json'])
       const findings = JSON.parse(result.stdout)
       expect(findings).to.be.an('array').with.length.greaterThan(0)
-      for (const key of ['file', 'line', 'column', 'rule', 'level', 'message', 'source']) {
+      for (const key of ['file', 'line', 'column', 'rule', 'level', 'explanation', 'suggestion', 'message', 'source']) {
         expect(findings[0]).to.have.property(key)
       }
       for (const finding of findings) {
         expect(finding.level).to.be.oneOf(['error', 'warn'])
       }
       expect(result.status).to.equal(1)
+    })
+
+    it('prints one finding as type, location and rule followed by explanation and suggestion', () => {
+      const result = run(['-r', 'no-fixed-wait', 'checkout_test.js'])
+      expect(result.stdout).to.include('error checkout_test.js:4  no-fixed-wait\n   I.wait() sleeps unconditionally\n   wait for a condition: I.waitForElement / I.waitForText / I.see')
+      expect(result.stdout).to.include('1 file(s) checked, 1 error(s), 0 warning(s)')
+      expect(result.stdout).to.not.include('\x1b[')
     })
 
     it('lists rules', () => {
@@ -253,7 +260,9 @@ describe('@codeceptjs/lint', () => {
         },
       })
       expect(result.status).to.equal(2)
-      expect(result.stderr).to.include('new_test.js:2:3  error  no-fixed-wait')
+      expect(result.stderr).to.include('error new_test.js:2  no-fixed-wait')
+      expect(result.stderr).to.include('I.wait() sleeps unconditionally')
+      expect(result.stderr).to.include('wait for a condition: I.waitForElement')
     })
 
     it('allows an edit that keeps existing errors', () => {
