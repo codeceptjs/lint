@@ -25,7 +25,9 @@ jobs:
       - name: Set package version
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          npm version "${TAG#v}" --no-git-tag-version
+          if [ "$(node -p "require('./package.json').version")" != "${TAG#v}" ]; then
+            npm version "${TAG#v}" --no-git-tag-version
+          fi
       - name: Publish to npm
         run: |
           TAG="${{ github.event.release.tag_name }}"
